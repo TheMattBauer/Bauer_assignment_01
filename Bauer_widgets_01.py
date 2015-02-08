@@ -162,7 +162,7 @@ class LoaderPanel:
                 self.master.ob_world.window = variable_list
             elif leading_char == "s":
                 self.master.ob_world.viewport = variable_list
-
+        file.close()
         self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
 
 
