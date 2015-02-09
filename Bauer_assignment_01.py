@@ -15,7 +15,7 @@ def close_window_callback(root):
 
 ob_root_window = Tk()
 ob_root_window.protocol("WM_DELETE_WINDOW", lambda root_window=ob_root_window: close_window_callback(root_window))
-ob_world = cl_world()
+ob_world = ClWorld()
 cl_widgets(ob_root_window, ob_world)
 ob_root_window.mainloop()    
     

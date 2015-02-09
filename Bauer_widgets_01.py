@@ -23,14 +23,17 @@ class cl_widgets:
 
 class cl_canvas_frame:
     def __init__(self, master):
+        # mouse variables
+        self.left_mouse_click_hold = False
+
         self.master = master
         self.canvas = Canvas(master.ob_root_window, width=640, height=640, bg="yellow")
         self.canvas.pack(expand=YES, fill=BOTH)
 
         self.canvas.bind('<Configure>', self.canvas_resized_callback)
         self.canvas.bind("<ButtonPress-1>", self.left_mouse_click_callback)
-        #self.canvas.bind("<ButtonRelease-1>", self.left_mouse_release_callback)
-        #self.canvas.bind("<B1-Motion>", self.left_mouse_down_motion_callback)
+        self.canvas.bind("<ButtonRelease-1>", self.left_mouse_release_callback)
+        self.canvas.bind("<Motion>", self.left_mouse_down_motion_callback)
         #self.canvas.bind("<ButtonPress-3>", self.right_mouse_click_callback)
         #self.canvas.bind("<ButtonRelease-3>", self.right_mouse_release_callback)
         #self.canvas.bind("<B3-Motion>", self.right_mouse_down_motion_callback)
@@ -74,32 +77,27 @@ class cl_canvas_frame:
         pass
 
     def f_key_pressed_callback(self, event):
-        print("f key was pressed")
+        pass
 
     def b_key_pressed_callback(self, event):
-        print("b key was pressed")
+        pass
 
     def left_mouse_click_callback(self, event):
-
-        self.x = event.x
-        self.y = event.y
-        self.canvas.focus_set()
+        print("callback")
+        self.left_mouse_click_hold = True
 
     def left_mouse_release_callback(self, event):
-        self.x = None
-        self.y = None
+        self.left_mouse_click_hold = False
 
     def left_mouse_down_motion_callback(self, event):
-        self.x = event.x
-        self.y = event.y
+        if self.left_mouse_click_hold:
+            self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
 
     def right_mouse_click_callback(self, event):
-        self.x = event.x
-        self.y = event.y
+        pass
 
     def right_mouse_release_callback(self, event):
-        self.x = None
-        self.y = None
+        pass
 
     def right_mouse_down_motion_callback(self, event):
         pass
@@ -136,6 +134,8 @@ class LoaderPanel:
         self.var_filename.set(filedialog.askopenfilename(filetypes=[("allfiles", "*"), ("pythonfiles", "*.txt")]))
 
     def load_file(self):
+        print("loading file")
+
         self.master.ob_world.reset_lists()
         file = open(self.var_filename.get())
         for line in file.read().splitlines():
