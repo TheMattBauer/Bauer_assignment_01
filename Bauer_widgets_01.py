@@ -6,16 +6,16 @@
 from tkinter import *
 from tkinter import simpledialog
 from tkinter import filedialog
+import time
 
 class cl_widgets:
     def __init__(self, ob_root_window, ob_world=[]):
         self.ob_root_window = ob_root_window
         self.ob_world = ob_world
-        self.menu = cl_menu(self)
         #self.toolbar = cl_toolbar(self)
         self.loader_panel = LoaderPanel(self)
-        self.pannel_01 = cl_pannel_01(self)
-        self.pannel_02 = cl_pannel_02(self)
+        self.rotator_panel = RotatorPanel(self)
+        self.scale_panel = ScalePanel(self)
         self.ob_canvas_frame = cl_canvas_frame(self)
         #self.status = cl_statusBar_frame(self)
         self.ob_world.add_canvas(self.ob_canvas_frame.canvas)
@@ -107,6 +107,155 @@ class cl_canvas_frame:
 
         self.canvas.pack()
         self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
+
+
+class RotatorPanel:
+    def __init__(self, master):
+        self.master = master
+        frame = Frame(master.ob_root_window)
+        frame.pack()
+
+        self.point_a = StringVar()
+        self.point_a.set("[0.0,0.0,0.0]")
+
+        self.point_b = StringVar()
+        self.point_b.set("[1.0,1.0,1.0]")
+
+        # start widgets
+        Label(frame, text="Rotation Axis:").pack(side=LEFT)
+
+        self.radio_button_group = IntVar()
+        Radiobutton(frame, text="X", variable=self.radio_button_group, value=1,
+                    command=self.disable_text_fields).pack(side=LEFT)
+        Radiobutton(frame, text="Y", variable=self.radio_button_group, value=2,
+                    command=self.disable_text_fields).pack(side=LEFT)
+        selected_radio = Radiobutton(frame, text="Z", variable=self.radio_button_group, value=3,
+                                     command=self.disable_text_fields)
+        selected_radio.pack(side=LEFT)
+        Radiobutton(frame, text="Line AB", variable=self.radio_button_group, value=4,
+                    command=self.activate_text_fields).pack(side=LEFT)
+        selected_radio.select()
+
+        Label(frame, text="A:").pack(side=LEFT)
+        self.point_a_text_field = Entry(frame, width=10, textvariable=self.point_a)
+        self.point_a_text_field.pack(side=LEFT)
+
+        Label(frame, text="B:").pack(side=LEFT)
+        self.point_b_text_field = Entry(frame, width=10, textvariable=self.point_b)
+        self.point_b_text_field.pack(side=LEFT)
+        self.disable_text_fields()
+
+        Label(frame, text="Degree:").pack(side=LEFT)
+        self.degree_spin_box = Spinbox(frame, width=3, from_=0, to=360)
+        self.degree_spin_box.pack(side=LEFT)
+
+        Label(frame, text="Steps:").pack(side=LEFT)
+        self.steps_spin_box = Spinbox(frame, width=3, from_=1, to=10)
+        self.steps_spin_box.pack(side=LEFT)
+
+        self.file_dialog_button = Button(frame, text="Rotate", fg="blue", command=self.rotate)
+        self.file_dialog_button.pack(side=LEFT)
+
+    def rotate(self):
+        theta_segment = int(self.degree_spin_box.get()) / int(self.steps_spin_box.get())
+        axis = int(self.radio_button_group.get())
+
+        if axis != 4:
+            for x in range(0, int(self.steps_spin_box.get())):
+                self.master.ob_world.rotate_theta(axis, theta_segment)
+                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+                self.master.ob_root_window.update()
+                time.sleep(.05)
+
+        else:
+            point_a_vector = str(self.point_a.get())[1:-1].strip().split(',')
+            point_b_vector = str(self.point_b.get())[1:-1].strip().split(',')
+            for x in range(0, int(self.steps_spin_box.get())):
+                self.master.ob_world.rotate_around_a_line(point_a_vector, point_b_vector, theta_segment)
+                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+                self.master.ob_root_window.update()
+                time.sleep(.05)
+
+
+    def activate_text_fields(self):
+        self.point_a_text_field.configure(state="normal")
+        self.point_b_text_field.configure(state="normal")
+
+    def disable_text_fields(self):
+        self.point_a_text_field.configure(state="disabled")
+        self.point_b_text_field.configure(state="disabled")
+
+
+class ScalePanel:
+    def __init__(self, master):
+        self.master = master
+        frame = Frame(master.ob_root_window)
+        frame.pack()
+
+        self.point = StringVar()
+        self.point.set("[0.0,0.0,0.0]")
+        self.scale_factor_string = StringVar()
+        self.scale_factor_string.set("[1,1,1]")
+
+        # start widgets
+        Label(frame, text="Scale Ratio:").pack(side=LEFT)
+
+        self.radio_button_group = IntVar()
+        selected_radio = Radiobutton(frame, text="All", variable=self.radio_button_group, value=1,
+                                     command=self.activate_scale_factor)
+        selected_radio.pack(side=LEFT)
+        selected_radio.select()
+        self.scale_factor = Spinbox(frame, width=4, from_=0.25, to=10, format="%.2f", increment=.25)
+        self.scale_factor.pack(side=LEFT)
+        Radiobutton(frame, text="[Sx,Sy,Sz]", variable=self.radio_button_group, value=2,
+                    command=self.activate_entry).pack(side=LEFT)
+        self.point_text_field = Entry(frame, width=10, textvariable=self.point)
+        self.point_text_field.pack(side=LEFT)
+        self.scale_factor_text_field = Entry(frame, width=10, textvariable=self.scale_factor_string)
+        self.scale_factor_text_field.pack(side=LEFT)
+        self.activate_scale_factor()
+
+        Label(frame, text="Steps:").pack(side=LEFT)
+        self.steps_spin_box = Spinbox(frame, width=3, from_=1, to=10)
+        self.steps_spin_box.pack(side=LEFT)
+
+        self.file_dialog_button = Button(frame, text="Scale", fg="blue", command=self.scale)
+        self.file_dialog_button.pack(side=LEFT)
+
+    def scale(self):
+        if self.radio_button_group.get() == 1:
+            factor = (float(self.scale_factor.get()) - 1.0) / float(self.steps_spin_box.get())
+            saved_vertices = self.master.ob_world.vertices.copy()
+            for x in range(0, int(self.steps_spin_box.get())):
+                self.master.ob_world.vertices = saved_vertices.copy()
+                self.master.ob_world.scale(factor * (x+1) + 1, factor * (x+1) + 1, factor * (x+1) + 1)
+                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+                self.master.ob_root_window.update()
+                time.sleep(.05)
+
+        elif self.radio_button_group.get() == 2:
+
+            split_factor = str(self.scale_factor_string.get())[1:-1].strip().split(',')
+
+            factor_x = (float(split_factor[0]) - 1.0) / float(self.steps_spin_box.get())
+            factor_y = (float(split_factor[1]) - 1.0) / float(self.steps_spin_box.get())
+            factor_z = (float(split_factor[2]) - 1.0) / float(self.steps_spin_box.get())
+            saved_vertices = self.master.ob_world.vertices.copy()
+            for x in range(0, int(self.steps_spin_box.get())):
+                self.master.ob_world.vertices = saved_vertices.copy()
+                self.master.ob_world.scale(factor_x * (x+1) + 1, factor_y * (x+1) + 1, factor_z * (x+1) + 1)
+                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+                self.master.ob_root_window.update()
+                time.sleep(.05)
+
+    def activate_scale_factor(self):
+        self.scale_factor.configure(state="normal")
+        self.scale_factor_text_field.configure(state="disabled")
+        self.point_text_field.configure(state="disabled")
+
+    def activate_entry(self):
+        self.scale_factor.configure(state="disabled")
+        self.scale_factor_text_field.configure(state="normal")
 
 
 class LoaderPanel:

@@ -11,6 +11,10 @@ class ClWorld:
         self.faces = []
         self.window = None
         self.viewport = None
+        self.composite_transform = [[1, 0, 0, 0],
+                                    [0, 1, 0, 0],
+                                    [0, 0, 1, 0],
+                                    [0, 0, 0, 1]]
 
         # mouse variables
         self._x = None
@@ -24,51 +28,8 @@ class ClWorld:
         canvas.world = self
 
     def create_graphic_objects(self, canvas, event=None):
-        if event:
-            if self._y:
-                y_rotation = 0
-                if self._y > event.y:
-                    y_rotation = self._y - event.y
-                elif self._y < event.y:
-                    y_rotation = self._y - event.y
-
-                x_rotation = 0
-                if self._x > event.x:
-                    x_rotation = self._x - event.x
-                elif self._x < event.x:
-                    x_rotation = self._x - event.x
-
-                composite_matrix = None
-                y_rotation_matrix = None
-                if y_rotation != 0:
-                    # rotate around z axis
-                    y_rotation_matrix = [[1, 0, 0, 0],
-                                         [0, math.cos(y_rotation*.001), -math.sin(y_rotation*.001), 0],
-                                         [0, math.sin(y_rotation*.001), math.cos(y_rotation*.001), 0],
-                                         [0, 0, 0, 1]]
-                    composite_matrix = y_rotation_matrix
-
-                if x_rotation != 0:
-                    # rotate around y axis
-                    x_rotation_matrix = [[math.cos(x_rotation*.001), 0, math.sin(x_rotation*.001), 0],
-                                         [0, 1, 0, 0],
-                                         [-math.sin(x_rotation*.001), 0, math.cos(x_rotation*.001), 0],
-                                         [0, 0, 0, 1]]
-
-                    if y_rotation_matrix:
-                        composite_matrix = multiply_matrix(y_rotation_matrix, x_rotation_matrix)
-                    else:
-                        composite_matrix = x_rotation_matrix
-
-                if composite_matrix:
-                    for x in range(0, len(self.vertices)):
-                        self.vertices[x] = multiply_vector(composite_matrix, self.vertices[x])
-
-            # set local x and y values for the next method run
-            self._x = event.x
-            self._y = event.y
-        else:
-            self._y = None
+        for x in range(0, len(self.vertices)):
+            self.vertices[x] = multiply_vector(self.composite_transform, self.vertices[x])
 
         min_x = float(canvas.cget("width")) * self.viewport[0]
         max_x = float(canvas.cget("width")) * self.viewport[2]
@@ -124,8 +85,91 @@ class ClWorld:
             self.objects.append(canvas.create_polygon(points, fill="red"))
             self.objects.append(canvas.create_line(points))
 
+        self.composite_transform = [[1, 0, 0, 0],
+                                    [0, 1, 0, 0],
+                                    [0, 0, 1, 0],
+                                    [0, 0, 0, 1]]
+
+    def rotate_around_a_line(self, point_a, point_b, theta):
+        point_a[0] = float(point_a[0])
+        point_a[1] = float(point_a[1])
+        point_a[2] = float(point_a[2])
+
+        point_b[0] = float(point_b[0])
+        point_b[1] = float(point_b[1])
+        point_b[2] = float(point_b[2])
+
+        theta = math.radians(theta)
+        transpose = [[1, 0, 0, -point_a[0]],
+                     [0, 1, 0, -point_a[1]],
+                     [0, 0, 1, -point_a[2]],
+                     [0, 0, 0, 1]]
+
+        r_x_denominator = math.sqrt(point_b[2]*point_b[2] + point_b[1]*point_b[1])
+        r_x = [[1, 0, 0, 0],
+               [0, point_b[2]/r_x_denominator, -point_b[1]/r_x_denominator, 0],
+               [0, point_b[1]/r_x_denominator, point_b[2]/r_x_denominator, 0],
+               [0, 0, 0, 1]]
+        r_y_denominator = math.sqrt(point_b[2]*point_b[2] + point_b[0]*point_b[0])
+        r_y = [[point_b[2]/r_y_denominator, 0, -point_b[0]/r_y_denominator, 0],
+               [0, 1, 0, 0],
+               [point_b[0]/r_y_denominator, 0, point_b[2]/r_y_denominator, 0],
+               [0, 0, 0, 1]]
+        rotation = [[math.cos(theta), -math.sin(theta), 0, 0],
+                    [math.sin(theta), math.cos(theta), 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+        r_y_transpose = [[point_b[2]/r_y_denominator, 0, point_b[0]/r_y_denominator, 0],
+                         [0, 1, 0, 0],
+                         [-point_b[0]/r_y_denominator, 0, point_b[2]/r_y_denominator, 0],
+                         [0, 0, 0, 1]]
+        r_x_transpose = [[1, 0, 0, 0],
+                         [0, point_b[2]/r_x_denominator, point_b[1]/r_x_denominator, 0],
+                         [0, -point_b[1]/r_x_denominator, point_b[2]/r_x_denominator, 0],
+                         [0, 0, 0, 1]]
+        transpose_inverse = [[1, 0, 0, point_a[0]],
+                             [0, 1, 0, point_a[1]],
+                             [0, 0, 1, point_a[2]],
+                             [0, 0, 0, 1]]
+
+        self.composite_transform = multiply_matrix(rotation, multiply_matrix(
+            r_y, multiply_matrix(r_x, multiply_matrix(transpose, self.composite_transform))))
+        self.composite_transform = multiply_matrix(transpose_inverse, multiply_matrix(
+            r_x_transpose, multiply_matrix(r_y_transpose, self.composite_transform)))
+
+    def rotate_theta(self, axis, theta):
+        theta = math.radians(theta)
+        rotation = [[1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+        if axis == 1:
+            rotation = [[1, 0, 0, 0],
+                        [0, math.cos(theta), -math.sin(theta), 0],
+                        [0, math.sin(theta), math.cos(theta), 0],
+                        [0, 0, 0, 1]]
+        elif axis == 2:
+            rotation = [[math.cos(theta), 0, math.sin(theta), 0],
+                        [0, 1, 0, 0],
+                        [-math.sin(theta), 0, math.cos(theta), 0],
+                        [0, 0, 0, 1]]
+        elif axis == 3:
+            rotation = [[math.cos(theta), -math.sin(theta), 0, 0],
+                        [math.sin(theta), math.cos(theta), 0, 0],
+                        [0, 0, 1, 0],
+                        [0, 0, 0, 1]]
+        self.composite_transform = multiply_matrix(rotation, self.composite_transform)
+
+    def scale(self, s_x, s_y, s_z):
+        scale_matrix = [[s_x, 0, 0, 0],
+                        [0, s_y, 0, 0],
+                        [0, 0, s_z, 0],
+                        [0, 0, 0, 1]]
+        self.composite_transform = multiply_matrix(scale_matrix, self.composite_transform)
+
     def redisplay(self, canvas, event=None):
         canvas.delete("all")
+        self.rotate_with_mouse(event)
         self.create_graphic_objects(canvas, event)
 
     def reset_lists(self):
@@ -133,6 +177,33 @@ class ClWorld:
         self.faces = []
         self.window = None
         self.viewport = None
+
+    def rotate_with_mouse(self, event):
+        if event:
+            if self._y:
+                y_rotation = 0
+                if self._y > event.y:
+                    y_rotation = self._y - event.y
+                elif self._y < event.y:
+                    y_rotation = -(event.y - self._y)
+
+                x_rotation = 0
+                if self._x > event.x:
+                    x_rotation = self._x - event.x
+                elif self._x < event.x:
+                    x_rotation = -(event.x - self._x)
+
+                if y_rotation != 0:
+                    self.rotate_theta(1, y_rotation)
+
+                if x_rotation != 0:
+                    self.rotate_theta(2, x_rotation)
+
+            # set local x and y values for the next method run
+            self._x = event.x
+            self._y = event.y
+        else:
+            self._y = None
 
 
 def multiply_vector(matrix, vector):
