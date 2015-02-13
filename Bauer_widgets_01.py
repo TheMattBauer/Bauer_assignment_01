@@ -25,6 +25,7 @@ class cl_canvas_frame:
     def __init__(self, master):
         # mouse variables
         self.left_mouse_click_hold = False
+        self.right_mouse_click_hold = False
 
         self.master = master
         self.canvas = Canvas(master.ob_root_window, width=640, height=640, bg="yellow")
@@ -33,10 +34,9 @@ class cl_canvas_frame:
         self.canvas.bind('<Configure>', self.canvas_resized_callback)
         self.canvas.bind("<ButtonPress-1>", self.left_mouse_click_callback)
         self.canvas.bind("<ButtonRelease-1>", self.left_mouse_release_callback)
-        self.canvas.bind("<Motion>", self.left_mouse_down_motion_callback)
-        #self.canvas.bind("<ButtonPress-3>", self.right_mouse_click_callback)
-        #self.canvas.bind("<ButtonRelease-3>", self.right_mouse_release_callback)
-        #self.canvas.bind("<B3-Motion>", self.right_mouse_down_motion_callback)
+        self.canvas.bind("<ButtonPress-3>", self.right_mouse_click_callback)
+        self.canvas.bind("<ButtonRelease-3>", self.right_mouse_release_callback)
+        self.canvas.bind("<Motion>", self.mouse_motion_callback)
         #self.canvas.bind("<Key>", self.key_pressed_callback)    
         self.canvas.bind("<Up>", self.up_arrow_pressed_callback)
         self.canvas.bind("<Down>", self.down_arrow_pressed_callback)
@@ -83,24 +83,26 @@ class cl_canvas_frame:
         pass
 
     def left_mouse_click_callback(self, event):
-        print("callback")
         self.left_mouse_click_hold = True
+        self.right_mouse_click_hold = False
 
     def left_mouse_release_callback(self, event):
         self.left_mouse_click_hold = False
 
-    def left_mouse_down_motion_callback(self, event):
-        if self.left_mouse_click_hold:
-            self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
-
     def right_mouse_click_callback(self, event):
-        pass
+        self.right_mouse_click_hold = True
+        self.left_mouse_click_hold = False
 
     def right_mouse_release_callback(self, event):
-        pass
+        self.right_mouse_click_hold = False
 
-    def right_mouse_down_motion_callback(self, event):
-        pass
+    def mouse_motion_callback(self, event):
+        if self.right_mouse_click_hold:
+            self.master.ob_world.scale_with_mouse(event)
+            self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
+        if self.left_mouse_click_hold:
+            self.master.ob_world.rotate_with_mouse(event)
+            self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
 
     def canvas_resized_callback(self, event):
         self.canvas.config(width=event.width - 4, height=event.height - 4)
@@ -171,11 +173,10 @@ class RotatorPanel:
             point_a_vector = str(self.point_a.get())[1:-1].strip().split(',')
             point_b_vector = str(self.point_b.get())[1:-1].strip().split(',')
             for x in range(0, int(self.steps_spin_box.get())):
-                self.master.ob_world.rotate_around_a_line(point_a_vector, point_b_vector, theta_segment)
+                self.master.ob_world.rotate_around_a_line(point_a_vector.copy(), point_b_vector.copy(), theta_segment)
                 self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
                 self.master.ob_root_window.update()
                 time.sleep(.05)
-
 
     def activate_text_fields(self):
         self.point_a_text_field.configure(state="normal")
@@ -283,8 +284,6 @@ class LoaderPanel:
         self.var_filename.set(filedialog.askopenfilename(filetypes=[("allfiles", "*"), ("pythonfiles", "*.txt")]))
 
     def load_file(self):
-        print("loading file")
-
         self.master.ob_world.reset_lists()
         file = open(self.var_filename.get())
         for line in file.read().splitlines():

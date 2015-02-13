@@ -74,7 +74,6 @@ class ClWorld:
         new_verts = self.vertices.copy()
         for x in range(0, len(new_verts)):
             new_verts[x] = multiply_vector(composite_transform, new_verts[x])
-            pass
 
         for face in self.faces:
             points = []
@@ -98,35 +97,44 @@ class ClWorld:
         point_b[0] = float(point_b[0])
         point_b[1] = float(point_b[1])
         point_b[2] = float(point_b[2])
+        point_b.append(1.0)
 
         theta = math.radians(theta)
+
         transpose = [[1, 0, 0, -point_a[0]],
                      [0, 1, 0, -point_a[1]],
                      [0, 0, 1, -point_a[2]],
                      [0, 0, 0, 1]]
+        point_b = multiply_vector(transpose, point_b)
+        # NOTE: use point_b' for other matrices and continue using the updated values
 
         r_x_denominator = math.sqrt(point_b[2]*point_b[2] + point_b[1]*point_b[1])
         r_x = [[1, 0, 0, 0],
                [0, point_b[2]/r_x_denominator, -point_b[1]/r_x_denominator, 0],
                [0, point_b[1]/r_x_denominator, point_b[2]/r_x_denominator, 0],
                [0, 0, 0, 1]]
-        r_y_denominator = math.sqrt(point_b[2]*point_b[2] + point_b[0]*point_b[0])
-        r_y = [[point_b[2]/r_y_denominator, 0, -point_b[0]/r_y_denominator, 0],
+
+        r_y_denominator = math.sqrt(point_b[2]*point_b[2] + point_b[0]*point_b[0] + point_b[1]*point_b[1])
+        r_y = [[r_x_denominator/r_y_denominator, 0, -point_b[0]/r_y_denominator, 0],
                [0, 1, 0, 0],
-               [point_b[0]/r_y_denominator, 0, point_b[2]/r_y_denominator, 0],
+               [point_b[0]/r_y_denominator, 0, r_x_denominator/r_y_denominator, 0],
                [0, 0, 0, 1]]
+
         rotation = [[math.cos(theta), -math.sin(theta), 0, 0],
                     [math.sin(theta), math.cos(theta), 0, 0],
                     [0, 0, 1, 0],
                     [0, 0, 0, 1]]
-        r_y_transpose = [[point_b[2]/r_y_denominator, 0, point_b[0]/r_y_denominator, 0],
+
+        r_y_transpose = [[r_x_denominator/r_y_denominator, 0, point_b[0]/r_y_denominator, 0],
                          [0, 1, 0, 0],
-                         [-point_b[0]/r_y_denominator, 0, point_b[2]/r_y_denominator, 0],
+                         [-point_b[0]/r_y_denominator, 0, r_x_denominator/r_y_denominator, 0],
                          [0, 0, 0, 1]]
+
         r_x_transpose = [[1, 0, 0, 0],
                          [0, point_b[2]/r_x_denominator, point_b[1]/r_x_denominator, 0],
                          [0, -point_b[1]/r_x_denominator, point_b[2]/r_x_denominator, 0],
                          [0, 0, 0, 1]]
+
         transpose_inverse = [[1, 0, 0, point_a[0]],
                              [0, 1, 0, point_a[1]],
                              [0, 0, 1, point_a[2]],
@@ -169,7 +177,6 @@ class ClWorld:
 
     def redisplay(self, canvas, event=None):
         canvas.delete("all")
-        self.rotate_with_mouse(event)
         self.create_graphic_objects(canvas, event)
 
     def reset_lists(self):
@@ -180,27 +187,45 @@ class ClWorld:
 
     def rotate_with_mouse(self, event):
         if event:
-            if self._y:
+            if self._x:
                 y_rotation = 0
                 if self._y > event.y:
-                    y_rotation = self._y - event.y
+                    y_rotation = -1
                 elif self._y < event.y:
-                    y_rotation = -(event.y - self._y)
+                    y_rotation = 1
 
                 x_rotation = 0
                 if self._x > event.x:
-                    x_rotation = self._x - event.x
+                    x_rotation = -1
                 elif self._x < event.x:
-                    x_rotation = -(event.x - self._x)
+                    x_rotation = 1
 
                 if y_rotation != 0:
-                    self.rotate_theta(1, y_rotation)
+                    self.rotate_theta(1, 10 * y_rotation)
 
                 if x_rotation != 0:
-                    self.rotate_theta(2, x_rotation)
+                    self.rotate_theta(2, 10 * x_rotation)
 
             # set local x and y values for the next method run
             self._x = event.x
+            self._y = event.y
+        else:
+            self._x = None
+            self._y = None
+
+    def scale_with_mouse(self, event):
+        if event:
+            if self._y:
+                y_rotation = 0
+                if self._y > event.y:
+                    y_rotation = -1
+                elif self._y < event.y:
+                    y_rotation = 1
+
+                if y_rotation != 0:
+                    self.scale(1.0 + y_rotation*.1, 1.0 + y_rotation*.1, 1.0 + y_rotation*.1)
+
+            # set local x and y values for the next method run
             self._y = event.y
         else:
             self._y = None
