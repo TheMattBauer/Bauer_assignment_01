@@ -16,6 +16,7 @@ class cl_widgets:
         self.loader_panel = LoaderPanel(self)
         self.rotator_panel = RotatorPanel(self)
         self.scale_panel = ScalePanel(self)
+        self.translate_panel = TranslationPanel(self)
         self.ob_canvas_frame = cl_canvas_frame(self)
         #self.status = cl_statusBar_frame(self)
         self.ob_world.add_canvas(self.ob_canvas_frame.canvas)
@@ -109,6 +110,49 @@ class cl_canvas_frame:
 
         self.canvas.pack()
         self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
+
+
+class TranslationPanel:
+    def __init__(self, master):
+        self.master = master
+        frame = Frame(master.ob_root_window)
+        frame.pack()
+
+        self.point = StringVar()
+        self.point.set("[10,10,10]")
+
+        # start widgets
+        Label(frame, text="Translation ([dx,dy,dz])").pack(side=LEFT)
+
+        self.point_text_field = Entry(frame, width=10, textvariable=self.point)
+        self.point_text_field.pack(side=LEFT)
+
+        Label(frame, text="Steps").pack(side=LEFT)
+        self.degree_spin_box = Spinbox(frame, width=3, from_=0, to=360)
+        self.degree_spin_box.pack(side=LEFT)
+
+        self.file_dialog_button = Button(frame, text="Translate", fg="blue", command=self.rotate)
+        self.file_dialog_button.pack(side=LEFT)
+
+    def rotate(self):
+        theta_segment = int(self.degree_spin_box.get()) / int(self.steps_spin_box.get())
+        axis = int(self.radio_button_group.get())
+
+        if axis != 4:
+            for x in range(0, int(self.steps_spin_box.get())):
+                self.master.ob_world.rotate_theta(axis, theta_segment)
+                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+                self.master.ob_root_window.update()
+                time.sleep(.05)
+
+        else:
+            point_a_vector = str(self.point_a.get())[1:-1].strip().split(',')
+            point_b_vector = str(self.point_b.get())[1:-1].strip().split(',')
+            for x in range(0, int(self.steps_spin_box.get())):
+                self.master.ob_world.rotate_around_a_line(point_a_vector.copy(), point_b_vector.copy(), theta_segment)
+                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+                self.master.ob_root_window.update()
+                time.sleep(.05)
 
 
 class RotatorPanel:
@@ -296,6 +340,14 @@ class LoaderPanel:
                     variable_list.append(float(value))
                 elif leading_char == "f":
                     variable_list.append(int(value) - 1)
+                elif leading_char == "r":
+                    variable_list.append(float(value))
+                elif leading_char == "n":
+                    variable_list.append(float(value))
+                elif leading_char == "u":
+                    variable_list.append(float(value))
+                elif leading_char == "p":
+                    variable_list.append(float(value))
                 elif leading_char == "w":
                     variable_list.append(float(value))
                 elif leading_char == "s":
@@ -306,8 +358,19 @@ class LoaderPanel:
                 self.master.ob_world.vertices.append(variable_list)
             elif leading_char == "f":
                 self.master.ob_world.faces.append(variable_list)
+            elif leading_char == "r":
+                self.master.ob_world.r = variable_list
+            elif leading_char == "n":
+                self.master.ob_world.n = variable_list
+            elif leading_char == "u":
+                self.master.ob_world.u = variable_list
+            elif leading_char == "p":
+                self.master.ob_world.p = variable_list
             elif leading_char == "w":
                 self.master.ob_world.window = variable_list
+                self.master.ob_world.center_of_window = [(variable_list[0] + variable_list[1]) / 2.0,
+                                                         (variable_list[2] + variable_list[3]) / 2.0,
+                                                         0]
             elif leading_char == "s":
                 self.master.ob_world.viewport = variable_list
         file.close()
