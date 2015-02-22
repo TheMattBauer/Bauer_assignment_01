@@ -1,7 +1,7 @@
 #Bauer, Matt
 #1000-631-613
 #2015-02-8
-#Assignment_01
+#Assignment_03
 
 import math
 
@@ -36,19 +36,11 @@ class ClWorld:
         for x in range(0, len(self.vertices)):
             self.vertices[x] = multiply_vector(self.composite_transform, self.vertices[x])
 
-        self.unit_cube_clip()
-
         min_x = float(canvas.cget("width")) * self.viewport[0]
         max_x = float(canvas.cget("width")) * self.viewport[2]
 
         min_y = float(canvas.cget("height")) * self.viewport[1]
         max_y = float(canvas.cget("height")) * self.viewport[3]
-
-        #print("screen min max")
-        #print(min_x)
-        #print(max_x)
-        #print(min_y)
-        #print(max_y)
 
         self.objects.append(canvas.create_rectangle(min_x, max_y, max_x, min_y))
 
@@ -60,6 +52,16 @@ class ClWorld:
 
         size_x = self.window[1] - self.window[0]
         size_y = self.window[3] - self.window[2]
+
+        scale_t = [[(max(self.window[0], self.window[1])-min(self.window[0], self.window[1])), 0, 0, 0],
+                    [0, (max(self.window[2], self.window[3])-min(self.window[2], self.window[3])), 0, 0],
+                    [0, 0, (max(self.window[4], self.window[5])-min(self.window[4], self.window[5])), 0],
+                    [0, 0, 0, 1]]
+
+        t2_1 = [[1, 0, 0, min(self.window[0], self.window[1])],
+               [0, 1, 0, min(self.window[2], self.window[3])],
+               [0, 0, 1, min(self.window[4], self.window[5])],
+               [0, 0, 0, 1]]
 
         window_transform = [[1, 0, 0, -self.window[0]],
                             [0, -1, 0, self.window[3]],
@@ -76,20 +78,18 @@ class ClWorld:
                               [0, 0, 1, 0],
                               [0, 0, 0, 1]]
 
-        composite_transform = multiply_matrix(viewport_transform, multiply_matrix(scale_transform, window_transform))
+        composite_transform = multiply_matrix(viewport_transform, multiply_matrix(scale_transform, multiply_matrix(window_transform, multiply_matrix(t2_1, scale_t))))
 
-        new_verts = self.vertices.copy()
-        for x in range(0, len(new_verts)):
-            new_verts[x] = multiply_vector(composite_transform, new_verts[x])
+        lines = self.unit_cube_clip()
+        # print(lines)
+        for line_index in range(0, len(lines)):
+            # print(lines[line_index])
+            for point_index in range(0, len(lines[line_index])):
+                lines[line_index][point_index].append(1.0)
+                lines[line_index][point_index] = multiply_vector(composite_transform, lines[line_index][point_index])
 
-        for face in self.faces:
-            points = []
-            for x in range(0, len(face)):
-                points.append(new_verts[face[x]][0])
-                points.append(new_verts[face[x]][1])
-
-            self.objects.append(canvas.create_polygon(points, fill="red"))
-            self.objects.append(canvas.create_line(points))
+            self.objects.append(canvas.create_line(lines[line_index][0][0], lines[line_index][0][1],
+                                                   lines[line_index][1][0], lines[line_index][1][1]))
 
         self.composite_transform = [[1, 0, 0, 0],
                                     [0, 1, 0, 0],
@@ -103,16 +103,28 @@ class ClWorld:
               [0, 0, 0, 1]]
 
         denom_rx = math.sqrt(self.n[1] * self.n[1] + self.n[2] * self.n[2])
-        rx = [[1, 0, 0, 0],
-              [0, self.n[2]/denom_rx,  -self.n[1]/denom_rx, 0],
-              [0, self.n[1]/denom_rx,  self.n[2]/denom_rx, 0],
-              [0, 0, 0, 1]]
+        if denom_rx == 0:
+            rx = [[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]
+        else:
+            rx = [[1, 0, 0, 0],
+                  [0, self.n[2]/denom_rx,  -self.n[1]/denom_rx, 0],
+                  [0, self.n[1]/denom_rx,  self.n[2]/denom_rx, 0],
+                  [0, 0, 0, 1]]
 
         denom_ry = math.sqrt(self.n[0] * self.n[0] + self.n[2] * self.n[2] + self.n[1]*self.n[1])
-        ry = [[denom_rx/denom_ry, 0, -self.n[0]/denom_ry, 0],
-              [0, 1, 0, 0],
-              [self.n[0]/denom_ry, 0, denom_rx/denom_ry, 0],
-              [0, 0, 0, 1]]
+        if denom_ry == 0:
+            ry = [[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]
+        else:
+            ry = [[denom_rx/denom_ry, 0, -self.n[0]/denom_ry, 0],
+                  [0, 1, 0, 0],
+                  [self.n[0]/denom_ry, 0, denom_rx/denom_ry, 0],
+                  [0, 0, 0, 1]]
 
         vup = self.u.copy()
         vup.append(1)
@@ -120,10 +132,16 @@ class ClWorld:
         vup = multiply_vector(ry, vup)
 
         denom_rz = math.sqrt(vup[0]*vup[0] + vup[1]*vup[1])
-        rz = [[vup[1]/denom_rz, -vup[0]/denom_rz, 0, 0],
-              [vup[0]/denom_rz, vup[1]/denom_rz, 0, 0],
-              [0, 0, 1, 0],
-              [0, 0, 0, 1]]
+        if denom_rz == 0:
+            rz = [[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]
+        else:
+            rz = [[vup[1]/denom_rz, -vup[0]/denom_rz, 0, 0],
+                  [vup[0]/denom_rz, vup[1]/denom_rz, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]
 
         direction_of_projection = [self.center_of_window[0] - self.p[0],
                                    self.center_of_window[1] - self.p[1],
@@ -146,22 +164,28 @@ class ClWorld:
 
         composite = multiply_matrix(scale, multiply_matrix(t2, multiply_matrix(shear, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
 
-        new_verts = self.vertices.copy()
-        for x in range(0, len(new_verts)):
-            new_verts[x] = multiply_vector(composite, new_verts[x])
+        verts = self.vertices.copy()
+        for x in range(0, len(verts)):
+            verts[x] = multiply_vector(composite, verts[x])
 
+        lines = []
         for face in self.faces:
             points = []
             for x in range(0, len(face)):
-                points.append([new_verts[face[x]][0],
-                               new_verts[face[x]][1],
-                               new_verts[face[x]][2]])
+                points.append([verts[face[x]][0],
+                               verts[face[x]][1],
+                               verts[face[x]][2],
+                               1.0])
 
             for x in range(0, len(points)):
-                if x+1 == len(points)-1:
-                    clip(points[x], points[0])
+                if x == len(points)-1:
+                    line = clip(points[x], points[0])
                 else:
-                    clip(points[x], points[x + 1])
+                    line = clip(points[x], points[x + 1])
+
+                if line:
+                    lines.append(line)
+        return lines
 
     def rotate_around_a_line(self, point_a, point_b, theta):
         point_a[0] = float(point_a[0])
@@ -309,24 +333,81 @@ def clip(point_a, point_b):
     a_byte_array = make_byte_array(point_a)
     b_byte_array = make_byte_array(point_b)
 
-    # print("point: " + point_a)
-    # print(a_byte_array)
-    # print("point: " + point_b)
-    # print(b_byte_array)
+    and_byte_array = []
+    or_byte_array = []
 
+    or_bytes = False
+
+    for x in range(0, len(a_byte_array)):
+        if a_byte_array[x] and b_byte_array[x]:
+            return None
+
+        if a_byte_array[x] or b_byte_array[x]:
+            or_bytes = True
+
+    if not or_bytes:
+        return [point_a, point_b]
+
+    new_points = []
     move_vector = subtract_vectors(point_b, point_a)
-    pass
+
+    plane_coefficients = [[1, 0, 0, -1],
+                          [1, 0, 0, 0],
+                          [0, 1, 0, -1],
+                          [0, 1, 0, 0],
+                          [0, 0, 1, -1],
+                          [0, 0, 1, 0]]
+
+    if 0 <= point_a[0] <= 1 and 0 <= point_a[1] <= 1 and 0 <= point_a[2] <= 1:
+        new_points.append(point_a)
+    if 0 <= point_b[0] <= 1 and 0 <= point_b[1] <= 1 and 0 <= point_b[2] <= 1:
+        new_points.append(point_b)
+
+    for plane_index in range(0, len(plane_coefficients)):
+        t = -(plane_coefficients[plane_index][0] * point_a[0] +
+              plane_coefficients[plane_index][1] * point_a[1] +
+              plane_coefficients[plane_index][2] * point_a[2] +
+              plane_coefficients[plane_index][3]) / \
+             (plane_coefficients[plane_index][0] * move_vector[0] +
+              plane_coefficients[plane_index][1] * move_vector[1] +
+              plane_coefficients[plane_index][2] * move_vector[2] + .000000000000000000000000001)
+        if 0 <= t <= 1:
+            # calculate new x y z point
+            point = [move_vector[0] * t + point_a[0],
+                     move_vector[1] * t + point_a[1],
+                     move_vector[2] * t + point_a[2],
+                     1.0]
+            if 0 <= point[0] <= 1 and 0 <= point[1] <= 1 and 0 <= point[2] <= 1:
+                new_points.append(point)
+                if len(new_points) == 2:
+                    return new_points
+    return None
+
+
+def transpose(matrix4):
+    transpose_mat = [[matrix4[0][0], matrix4[1][0], matrix4[2][0], matrix4[3][0]],
+                     [matrix4[0][1], matrix4[1][1], matrix4[2][1], matrix4[3][1]],
+                     [matrix4[0][2], matrix4[1][2], matrix4[2][2], matrix4[3][2]],
+                     [matrix4[0][3], matrix4[1][3], matrix4[2][3], matrix4[3][3]]]
+    return transpose_mat
+
 
 def make_byte_array(vector):
 
     byte_array = []
-    for x in range(0, len(vector)):
-        if x % 2 == 1:
-            byte_array.append(vector[x] <= 1)
-        else:
-            byte_array.append(vector[x] >= 0)
 
+    for x in range(0, len(vector)):
+        if vector[x] > 1:
+            byte_array.append(True)
+        else:
+            byte_array.append(False)
+
+        if vector[x] < 0:
+            byte_array.append(True)
+        else:
+            byte_array.append(False)
     return byte_array
+
 
 def subtract_vectors(vec_a, vec_b):
     return [vec_a[0] - vec_b[0],
