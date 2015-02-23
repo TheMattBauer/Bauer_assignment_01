@@ -17,6 +17,7 @@ class cl_widgets:
         self.rotator_panel = RotatorPanel(self)
         self.scale_panel = ScalePanel(self)
         self.translate_panel = TranslationPanel(self)
+        self.fly_panel = FlyPanel(self)
         self.ob_canvas_frame = cl_canvas_frame(self)
         #self.status = cl_statusBar_frame(self)
         self.ob_world.add_canvas(self.ob_canvas_frame.canvas)
@@ -110,6 +111,65 @@ class cl_canvas_frame:
 
         self.canvas.pack()
         self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
+
+
+class FlyPanel:
+    def __init__(self, master):
+        self.master = master
+        frame = Frame(master.ob_root_window)
+        frame.pack()
+
+        self.vrp1_point = StringVar()
+        self.vrp1_point.set("[0,0,0]")
+
+        self.vrp2_point = StringVar()
+        self.vrp2_point.set("[1,1,0]")
+
+        # start widgets
+        Label(frame, text="VRP 1([x,y,z]):").pack(side=LEFT)
+
+        self.vrp1_text_field = Entry(frame, width=10, textvariable=self.vrp1_point)
+        self.vrp1_text_field.pack(side=LEFT)
+
+        Label(frame, text="VRP 2([x,y,z]):").pack(side=LEFT)
+
+        self.vrp2_text_field = Entry(frame, width=10, textvariable=self.vrp2_point)
+        self.vrp2_text_field.pack(side=LEFT)
+
+        Label(frame, text="Steps").pack(side=LEFT)
+        self.steps_spin_box = Spinbox(frame, width=3, from_=1, to=10)
+        self.steps_spin_box.pack(side=LEFT)
+
+        self.file_dialog_button = Button(frame, text="Fly", fg="blue", command=self.fly)
+        self.file_dialog_button.pack(side=LEFT)
+
+    def fly(self):
+        vrp1 = str(self.vrp1_point.get())[1:-1].strip().split(',')
+        vrp1 = [float(i) for i in vrp1]
+
+        vrp2 = str(self.vrp2_point.get())[1:-1].strip().split(',')
+        vrp2 = [float(i) for i in vrp2]
+
+        move_delta = [vrp2[0] - vrp1[0],
+                      vrp2[1] - vrp1[1],
+                      vrp2[2] - vrp1[2]]
+
+        move_delta_segment = [move_delta[0]/float(self.steps_spin_box.get()),
+                              move_delta[1]/float(self.steps_spin_box.get()),
+                              move_delta[2]/float(self.steps_spin_box.get())]
+
+        self.master.ob_world.vrp = vrp1
+        self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+        self.master.ob_root_window.update()
+        for x in range(0, int(self.steps_spin_box.get())):
+            self.master.ob_world.move_vrp(move_delta_segment)
+            self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+            self.master.ob_root_window.update()
+            time.sleep(.05)
+
+        temp = self.vrp1_point.get()
+        self.vrp1_point.set(self.vrp2_point.get())
+        self.vrp2_point.set(temp)
 
 
 class TranslationPanel:

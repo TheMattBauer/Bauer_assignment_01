@@ -93,6 +93,9 @@ class ClWorld:
         t1 = translation_matrix(-move_amount[0], -move_amount[1], -move_amount[2])
         self.composite_transform = multiply_matrix(t1, self.composite_transform)
 
+    def move_vrp(self, move_amount):
+        self.vrp = add_vectors(self.vrp, move_amount)
+
     def unit_cube_clip(self):
         t1 = translation_matrix(self.vrp[0], self.vrp[1], self.vrp[2])
 
@@ -386,6 +389,13 @@ def subtract_vectors(vec_a, vec_b):
     return [vec_a[0] - vec_b[0],
             vec_a[1] - vec_b[1],
             vec_a[2] - vec_b[2]]
+
+
+def add_vectors(vec_a, vec_b):
+    return [vec_a[0] + vec_b[0],
+            vec_a[1] + vec_b[1],
+            vec_a[2] + vec_b[2],
+            1.0]
 
 
 def multiply_vector(matrix, vector):
