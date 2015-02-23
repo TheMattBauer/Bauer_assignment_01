@@ -128,31 +128,24 @@ class TranslationPanel:
         self.point_text_field.pack(side=LEFT)
 
         Label(frame, text="Steps").pack(side=LEFT)
-        self.degree_spin_box = Spinbox(frame, width=3, from_=0, to=360)
-        self.degree_spin_box.pack(side=LEFT)
+        self.steps_spin_box = Spinbox(frame, width=3, from_=1, to=10)
+        self.steps_spin_box.pack(side=LEFT)
 
-        self.file_dialog_button = Button(frame, text="Translate", fg="blue", command=self.rotate)
+        self.file_dialog_button = Button(frame, text="Translate", fg="blue", command=self.move)
         self.file_dialog_button.pack(side=LEFT)
 
-    def rotate(self):
-        theta_segment = int(self.degree_spin_box.get()) / int(self.steps_spin_box.get())
-        axis = int(self.radio_button_group.get())
+    def move(self):
+        move_delta = str(self.point.get())[1:-1].strip().split(',')
+        move_delta = [float(i) for i in move_delta]
+        move_delta_segment = [move_delta[0]/float(self.steps_spin_box.get()),
+                              move_delta[1]/float(self.steps_spin_box.get()),
+                              move_delta[2]/float(self.steps_spin_box.get())]
 
-        if axis != 4:
-            for x in range(0, int(self.steps_spin_box.get())):
-                self.master.ob_world.rotate_theta(axis, theta_segment)
-                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
-                self.master.ob_root_window.update()
-                time.sleep(.05)
-
-        else:
-            point_a_vector = str(self.point_a.get())[1:-1].strip().split(',')
-            point_b_vector = str(self.point_b.get())[1:-1].strip().split(',')
-            for x in range(0, int(self.steps_spin_box.get())):
-                self.master.ob_world.rotate_around_a_line(point_a_vector.copy(), point_b_vector.copy(), theta_segment)
-                self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
-                self.master.ob_root_window.update()
-                time.sleep(.05)
+        for x in range(0, int(self.steps_spin_box.get())):
+            self.master.ob_world.move(move_delta_segment)
+            self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+            self.master.ob_root_window.update()
+            time.sleep(.05)
 
 
 class RotatorPanel:
@@ -281,6 +274,8 @@ class ScalePanel:
         elif self.radio_button_group.get() == 2:
 
             split_factor = str(self.scale_factor_string.get())[1:-1].strip().split(',')
+            scale_point = str(self.point.get())[1:-1].strip().split(',')
+            scale_point = [float(i) for i in scale_point]
 
             factor_x = (float(split_factor[0]) - 1.0) / float(self.steps_spin_box.get())
             factor_y = (float(split_factor[1]) - 1.0) / float(self.steps_spin_box.get())
@@ -288,7 +283,8 @@ class ScalePanel:
             saved_vertices = self.master.ob_world.vertices.copy()
             for x in range(0, int(self.steps_spin_box.get())):
                 self.master.ob_world.vertices = saved_vertices.copy()
-                self.master.ob_world.scale(factor_x * (x+1) + 1, factor_y * (x+1) + 1, factor_z * (x+1) + 1)
+                self.master.ob_world.scale(factor_x * (x+1) + 1, factor_y * (x+1) + 1, factor_z * (x+1) + 1,
+                                           scale_point)
                 self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
                 self.master.ob_root_window.update()
                 time.sleep(.05)
@@ -300,6 +296,7 @@ class ScalePanel:
 
     def activate_entry(self):
         self.scale_factor.configure(state="disabled")
+        self.point_text_field.configure(state="normal")
         self.scale_factor_text_field.configure(state="normal")
 
 
@@ -359,13 +356,17 @@ class LoaderPanel:
             elif leading_char == "f":
                 self.master.ob_world.faces.append(variable_list)
             elif leading_char == "r":
-                self.master.ob_world.r = variable_list
+                variable_list.append(1.0)
+                self.master.ob_world.vrp = variable_list
             elif leading_char == "n":
-                self.master.ob_world.n = variable_list
+                variable_list.append(1.0)
+                self.master.ob_world.vpn = variable_list
             elif leading_char == "u":
-                self.master.ob_world.u = variable_list
+                variable_list.append(1.0)
+                self.master.ob_world.vup = variable_list
             elif leading_char == "p":
-                self.master.ob_world.p = variable_list
+                variable_list.append(1.0)
+                self.master.ob_world.prp = variable_list
             elif leading_char == "w":
                 self.master.ob_world.window = variable_list
                 self.master.ob_world.center_of_window = [(variable_list[0] + variable_list[1]) / 2.0,
@@ -373,6 +374,7 @@ class LoaderPanel:
                                                          0]
             elif leading_char == "s":
                 self.master.ob_world.viewport = variable_list
+        self.master.ob_world.object_origin = [0.0, 0.0, 0.0, 1.0]
         file.close()
         self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
 

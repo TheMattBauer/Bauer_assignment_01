@@ -9,8 +9,7 @@ from Bauer_graphics_01 import *
 
 
 def close_window_callback(root):
-    if messagebox.askokcancel("Quit", "Do you really wish to quit?"):
-        root.destroy()
+    root.destroy()
 
 
 ob_root_window = Tk()

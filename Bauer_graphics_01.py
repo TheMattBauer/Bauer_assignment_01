@@ -9,10 +9,10 @@ class ClWorld:
     def __init__(self, objects=[], canvases=[]):
         self.vertices = []
         self.faces = []
-        self.r = None
-        self.n = None
-        self.u = None
-        self.p = None
+        self.vrp = None
+        self.vpn = None
+        self.vup = None
+        self.prp = None
         self.window = None
         self.viewport = None
         self.center_of_window = None
@@ -20,6 +20,7 @@ class ClWorld:
                                     [0, 1, 0, 0],
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1]]
+        self.object_origin = [0.0, 0.0, 0.0, 1.0]
 
         # mouse variables
         self._x = None
@@ -33,6 +34,9 @@ class ClWorld:
         canvas.world = self
 
     def create_graphic_objects(self, canvas, event=None):
+
+        # track the origin of the object being displayed
+        self.object_origin = multiply_vector(self.composite_transform, self.object_origin)
         for x in range(0, len(self.vertices)):
             self.vertices[x] = multiply_vector(self.composite_transform, self.vertices[x])
 
@@ -53,30 +57,19 @@ class ClWorld:
         size_x = self.window[1] - self.window[0]
         size_y = self.window[3] - self.window[2]
 
-        scale_t = [[(max(self.window[0], self.window[1])-min(self.window[0], self.window[1])), 0, 0, 0],
-                    [0, (max(self.window[2], self.window[3])-min(self.window[2], self.window[3])), 0, 0],
-                    [0, 0, (max(self.window[4], self.window[5])-min(self.window[4], self.window[5])), 0],
-                    [0, 0, 0, 1]]
 
-        t2_1 = [[1, 0, 0, min(self.window[0], self.window[1])],
-               [0, 1, 0, min(self.window[2], self.window[3])],
-               [0, 0, 1, min(self.window[4], self.window[5])],
-               [0, 0, 0, 1]]
-
+        scale_t = scale_matrix(max(self.window[0], self.window[1])-min(self.window[0], self.window[1]),
+                               max(self.window[2], self.window[3])-min(self.window[2], self.window[3]),
+                               max(self.window[4], self.window[5])-min(self.window[4], self.window[5]))
+        t2_1 = translation_matrix(-min(self.window[0], self.window[1]),
+                                  -min(self.window[2], self.window[3]),
+                                  -min(self.window[4], self.window[5]))
         window_transform = [[1, 0, 0, -self.window[0]],
                             [0, -1, 0, self.window[3]],
                             [0, 0, 1, 0],
                             [0, 0, 0, 1]]
-
-        scale_transform = [[1/size_x * ratio_x, 0, 0, 0],
-                           [0, 1/size_y * ratio_y, 0, 0],
-                           [0, 0, 1, 0],
-                           [0, 0, 0, 1]]
-
-        viewport_transform = [[1, 0, 0, tran_x],
-                              [0, 1, 0, tran_y],
-                              [0, 0, 1, 0],
-                              [0, 0, 0, 1]]
+        scale_transform = scale_matrix(1/size_x * ratio_x, 1/size_y * ratio_y, 1)
+        viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
 
         composite_transform = multiply_matrix(viewport_transform, multiply_matrix(scale_transform, multiply_matrix(window_transform, multiply_matrix(t2_1, scale_t))))
 
@@ -96,71 +89,35 @@ class ClWorld:
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1]]
 
+    def move(self, move_amount):
+        t1 = translation_matrix(-move_amount[0], -move_amount[1], -move_amount[2])
+        self.composite_transform = multiply_matrix(t1, self.composite_transform)
+
     def unit_cube_clip(self):
-        t1 = [[1, 0, 0, -self.r[0]],
-              [0, 1, 0, -self.r[1]],
-              [0, 0, 1, -self.r[2]],
-              [0, 0, 0, 1]]
+        t1 = translation_matrix(self.vrp[0], self.vrp[1], self.vrp[2])
 
-        denom_rx = math.sqrt(self.n[1] * self.n[1] + self.n[2] * self.n[2])
-        if denom_rx == 0:
-            rx = [[1, 0, 0, 0],
-                  [0, 1, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]]
-        else:
-            rx = [[1, 0, 0, 0],
-                  [0, self.n[2]/denom_rx,  -self.n[1]/denom_rx, 0],
-                  [0, self.n[1]/denom_rx,  self.n[2]/denom_rx, 0],
-                  [0, 0, 0, 1]]
+        rx = rotate_to_plane_matrix('x', self.vpn[0], self.vpn[1], self.vpn[2])
+        vpn_prime = multiply_vector(rx, self.vpn)
 
-        denom_ry = math.sqrt(self.n[0] * self.n[0] + self.n[2] * self.n[2] + self.n[1]*self.n[1])
-        if denom_ry == 0:
-            ry = [[1, 0, 0, 0],
-                  [0, 1, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]]
-        else:
-            ry = [[denom_rx/denom_ry, 0, -self.n[0]/denom_ry, 0],
-                  [0, 1, 0, 0],
-                  [self.n[0]/denom_ry, 0, denom_rx/denom_ry, 0],
-                  [0, 0, 0, 1]]
+        ry = rotate_to_plane_matrix('y', vpn_prime[0], vpn_prime[1], vpn_prime[2])
 
-        vup = self.u.copy()
-        vup.append(1)
-        vup = multiply_vector(rx, vup)
-        vup = multiply_vector(ry, vup)
+        vup_prime = multiply_vector(rx, self.vup)
+        vup_prime = multiply_vector(ry, vup_prime)
+        rz = rotate_to_plane_matrix('z', vup_prime[0], vup_prime[1], vup_prime[2])
 
-        denom_rz = math.sqrt(vup[0]*vup[0] + vup[1]*vup[1])
-        if denom_rz == 0:
-            rz = [[1, 0, 0, 0],
-                  [0, 1, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]]
-        else:
-            rz = [[vup[1]/denom_rz, -vup[0]/denom_rz, 0, 0],
-                  [vup[0]/denom_rz, vup[1]/denom_rz, 0, 0],
-                  [0, 0, 1, 0],
-                  [0, 0, 0, 1]]
+        direction_of_projection = [self.center_of_window[0] - self.prp[0],
+                                   self.center_of_window[1] - self.prp[1],
+                                   -self.prp[2]]
 
-        direction_of_projection = [self.center_of_window[0] - self.p[0],
-                                   self.center_of_window[1] - self.p[1],
-                                   - self.p[2]]
+        shear = shear_matrix(direction_of_projection[0], direction_of_projection[1], direction_of_projection[2])
 
-        shear = [[1, 0, -direction_of_projection[0]/direction_of_projection[2], 0],
-                 [0, 1, -direction_of_projection[1]/direction_of_projection[2], 0],
-                 [0, 0, 1, 0],
-                 [0, 0, 0, 1]]
+        t2 = translation_matrix(min(self.window[0], self.window[1]),
+                                min(self.window[2], self.window[3]),
+                                min(self.window[4], self.window[5]))
 
-        t2 = [[1, 0, 0, -min(self.window[0], self.window[1])],
-              [0, 1, 0, -min(self.window[2], self.window[3])],
-              [0, 0, 1, -min(self.window[4], self.window[5])],
-              [0, 0, 0, 1]]
-
-        scale = [[1/(max(self.window[0], self.window[1])-min(self.window[0], self.window[1])), 0, 0, 0],
-                 [0, 1/(max(self.window[2], self.window[3])-min(self.window[2], self.window[3])), 0, 0],
-                 [0, 0, 1/(max(self.window[4], self.window[5])-min(self.window[4], self.window[5])), 0],
-                 [0, 0, 0, 1]]
+        scale = scale_matrix(1/(max(self.window[0], self.window[1])-min(self.window[0], self.window[1])),
+                             1/(max(self.window[2], self.window[3])-min(self.window[2], self.window[3])),
+                             1/(max(self.window[4], self.window[5])-min(self.window[4], self.window[5])))
 
         composite = multiply_matrix(scale, multiply_matrix(t2, multiply_matrix(shear, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
 
@@ -266,12 +223,25 @@ class ClWorld:
                         [0, 0, 0, 1]]
         self.composite_transform = multiply_matrix(rotation, self.composite_transform)
 
-    def scale(self, s_x, s_y, s_z):
+    def scale(self, s_x, s_y, s_z, point=None):
+        if point:
+            t1 = translation_matrix(point[0], point[1], point[2])
+            t2 = translation_matrix(-point[0], -point[1], -point[2])
+        else:
+            t1 = [[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]
+            t2 = [[1, 0, 0, 0],
+                  [0, 1, 0, 0],
+                  [0, 0, 1, 0],
+                  [0, 0, 0, 1]]
+
         scale_matrix = [[s_x, 0, 0, 0],
                         [0, s_y, 0, 0],
                         [0, 0, s_z, 0],
                         [0, 0, 0, 1]]
-        self.composite_transform = multiply_matrix(scale_matrix, self.composite_transform)
+        self.composite_transform = multiply_matrix(t2, multiply_matrix(scale_matrix, multiply_matrix(t1, self.composite_transform)))
 
     def redisplay(self, canvas, event=None):
         canvas.delete("all")
@@ -328,13 +298,16 @@ class ClWorld:
         else:
             self._y = None
 
+'''
+************************************************************
+
+************************************************************
+'''
+
 
 def clip(point_a, point_b):
     a_byte_array = make_byte_array(point_a)
     b_byte_array = make_byte_array(point_b)
-
-    and_byte_array = []
-    or_byte_array = []
 
     or_bytes = False
 
@@ -440,3 +413,77 @@ def multiply_matrix(matrix_a, matrix_b):
             for k in range(len(matrix_b)):
                 result[i][j] += matrix_a[i][k] * matrix_b[k][j]
     return result
+
+
+def scale_matrix(s_x, s_y, s_z):
+    return [[s_x, 0, 0, 0],
+            [0, s_y, 0, 0],
+            [0, 0, s_z, 0],
+            [0, 0, 0, 1]]
+
+
+def shear_matrix(a, b, c):
+    if c == 0:
+        return [[1, 0, 0, 0],
+                [0, 1, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]]
+
+    return [[1, 0, -a/c, 0],
+            [0, 1, -b/c, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]]
+
+
+def translation_matrix(t_x, t_y, t_z):
+    return [[1, 0, 0, -t_x],
+            [0, 1, 0, -t_y],
+            [0, 0, 1, -t_z],
+            [0, 0, 0, 1]]
+
+
+def rotate_to_plane_matrix(axis_of_rotation, a, b, c):
+    if axis_of_rotation == 'x':
+        denominator = math.sqrt(b*b+c*c)
+        if denominator == 0:
+            return [[1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+        cos = c / denominator
+        sin = b / denominator
+        return [[1, 0, 0, 0],
+                [0, cos, -sin, 0],
+                [0, sin, cos, 0],
+                [0, 0, 0, 1]]
+    elif axis_of_rotation == 'y':
+        denominator = math.sqrt(a*a+c*c)
+        if denominator == 0:
+            return [[1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+        cos = c / denominator
+        sin = a / denominator
+        return [[cos, 0, -sin, 0],
+                [0, 1, 0, 0],
+                [sin, 0, cos, 0],
+                [0, 0, 0, 1]]
+    elif axis_of_rotation == 'z':
+        denominator = math.sqrt(a*a+b*b)
+        if denominator == 0:
+            return [[1, 0, 0, 0],
+                    [0, 1, 0, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1]]
+        cos = b / denominator
+        sin = a / denominator
+        return [[cos, -sin, 0, 0],
+                [sin, cos, 0, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]]
+
+    return [[1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]]
