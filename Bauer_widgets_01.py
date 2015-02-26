@@ -18,6 +18,7 @@ class cl_widgets:
         self.scale_panel = ScalePanel(self)
         self.translate_panel = TranslationPanel(self)
         self.fly_panel = FlyPanel(self)
+        self.perspective_panel = PerspectivePanel(self)
         self.ob_canvas_frame = cl_canvas_frame(self)
         #self.status = cl_statusBar_frame(self)
         self.ob_world.add_canvas(self.ob_canvas_frame.canvas)
@@ -112,6 +113,31 @@ class cl_canvas_frame:
         self.canvas.pack()
         self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas, event)
 
+
+class PerspectivePanel:
+    def __init__(self, master):
+        self.master = master
+        frame = Frame(master.ob_root_window)
+        frame.pack()
+
+        # start widgets
+        Label(frame, text="Perspective:").pack(side=LEFT)
+
+        self.radio_button_group = IntVar()
+        selected_radio = Radiobutton(frame, text="Parallel", variable=self.radio_button_group, value=1,
+                                     command=self.parallel)
+        selected_radio.pack(side=LEFT)
+        Radiobutton(frame, text="Projection", variable=self.radio_button_group, value=2,
+                    command=self.projection).pack(side=LEFT)
+        selected_radio.select()
+
+    def parallel(self):
+        self.master.ob_world.is_parallel = True
+        self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
+
+    def projection(self):
+        self.master.ob_world.is_parallel = False
+        self.master.ob_world.redisplay(self.master.ob_canvas_frame.canvas)
 
 class FlyPanel:
     def __init__(self, master):

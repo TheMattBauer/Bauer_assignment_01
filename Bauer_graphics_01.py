@@ -21,6 +21,7 @@ class ClWorld:
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1]]
         self.object_origin = [0.0, 0.0, 0.0, 1.0]
+        self.is_parallel = True
 
         # mouse variables
         self._x = None
@@ -73,7 +74,15 @@ class ClWorld:
 
         composite_transform = multiply_matrix(viewport_transform, multiply_matrix(scale_transform, multiply_matrix(window_transform, multiply_matrix(t2_1, scale_t))))
 
-        lines = self.unit_cube_clip()
+        lines = None
+        if self.is_parallel:
+            lines = self.unit_cube_clip()
+        else:
+            lines = self.prp_clip()
+
+        if not lines:
+            return
+
         # print(lines)
         for line_index in range(0, len(lines)):
             # print(lines[line_index])
@@ -88,6 +97,68 @@ class ClWorld:
                                     [0, 1, 0, 0],
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1]]
+
+    def prp_clip(self):
+        t1 = translation_matrix(self.vrp[0], self.vrp[1], self.vrp[2])
+
+        rx = rotate_to_plane_matrix('x', self.vpn[0], self.vpn[1], self.vpn[2])
+        vpn_prime = multiply_vector(rx, self.vpn)
+
+        ry = rotate_to_plane_matrix('y', vpn_prime[0], vpn_prime[1], vpn_prime[2])
+
+        vup_prime = multiply_vector(rx, self.vup)
+        vup_prime = multiply_vector(ry, vup_prime)
+        rz = rotate_to_plane_matrix('z', vup_prime[0], vup_prime[1], vup_prime[2])
+
+        #************************************************************
+
+        t2 = translation_matrix(self.prp[0], self.prp[1], self.prp[2])
+
+        direction_of_projection = [self.center_of_window[0] - self.prp[0],
+                                   self.center_of_window[1] - self.prp[1],
+                                   -self.prp[2]]
+        shear = shear_matrix(direction_of_projection[0], direction_of_projection[1], direction_of_projection[2])
+
+        vrp_prime = multiply_vector(t2, self.vrp)
+        vrp_prime = multiply_vector(shear, vrp_prime)
+
+        if (vrp_prime[2] + self.window[4]) * (vrp_prime[2] + self.window[5]) < 0:
+            # double sided view volume
+            return None
+
+        if abs(vrp_prime[2] + self.window[5]) > abs(self.vrp[2] + self.window[4]):
+            scale = scale_matrix(abs(vrp_prime[2]) / (self.center_of_window[0] * (vrp_prime[2] + self.window[5]) + .00000000000000000000000000001),
+                                 abs(vrp_prime[2]) / (self.center_of_window[1] * (vrp_prime[2] + self.window[5]) + .00000000000000000000000000001),
+                                 1 / (vrp_prime[2] + self.window[5]))
+        else:
+            scale = scale_matrix(abs(vrp_prime[2]) / (self.center_of_window[0] * (vrp_prime[2] + self.window[4]) + .00000000000000000000000000001),
+                                 abs(vrp_prime[2]) / (self.center_of_window[1] * (vrp_prime[2] + self.window[4]) + .00000000000000000000000000001),
+                                 1 / (vrp_prime[2] + self.window[4]))
+
+        composite = multiply_matrix(scale, multiply_matrix(shear, multiply_matrix(t2, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
+
+        verts = self.vertices.copy()
+        for x in range(0, len(verts)):
+            verts[x] = multiply_vector(composite, verts[x])
+
+        lines = []
+        for face in self.faces:
+            points = []
+            for x in range(0, len(face)):
+                points.append([verts[face[x]][0],
+                               verts[face[x]][1],
+                               verts[face[x]][2],
+                               1.0])
+
+            for x in range(0, len(points)):
+                if x == len(points)-1:
+                    line = clip_line_perspective(points[x], points[0])
+                else:
+                    line = clip_line_perspective(points[x], points[x + 1])
+
+                if line:
+                    lines.append(line)
+        return lines
 
     def move(self, move_amount):
         t1 = translation_matrix(-move_amount[0], -move_amount[1], -move_amount[2])
@@ -139,9 +210,9 @@ class ClWorld:
 
             for x in range(0, len(points)):
                 if x == len(points)-1:
-                    line = clip(points[x], points[0])
+                    line = clip_line_parallel(points[x], points[0])
                 else:
-                    line = clip(points[x], points[x + 1])
+                    line = clip_line_parallel(points[x], points[x + 1])
 
                 if line:
                     lines.append(line)
@@ -308,7 +379,11 @@ class ClWorld:
 '''
 
 
-def clip(point_a, point_b):
+def clip_line_perspective(point_a, point_b):
+    return [point_b, point_a]
+
+
+def clip_line_parallel(point_a, point_b):
     a_byte_array = make_byte_array(point_a)
     b_byte_array = make_byte_array(point_b)
 
