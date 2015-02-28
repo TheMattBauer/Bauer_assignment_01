@@ -53,19 +53,21 @@ class ClWorld:
         tran_x = min_x
 
         ratio_y = (max_y - min_y)
-        tran_y = min_y
+        tran_y = max_y
 
         size_x = self.window[1] - self.window[0]
         size_y = self.window[3] - self.window[2]
 
-        window_transform = [[1, 0, 0, -self.window[0]],
-                            [0, -1, 0, self.window[3]],
+        window_transform = [[1, 0, 0, 0],
+                            [0, -1, 0, 0],
                             [0, 0, 1, 0],
                             [0, 0, 0, 1]]
         scale_transform = scale_matrix(ratio_x, ratio_y, 1)
         viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
 
-        composite_transform = multiply_matrix(viewport_transform, scale_transform)
+        composite_transform = window_transform
+        composite_transform = multiply_matrix(scale_transform, composite_transform)
+        composite_transform = multiply_matrix(viewport_transform, composite_transform)
 
         lines = None
         if self.is_parallel:
