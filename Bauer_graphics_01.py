@@ -58,21 +58,14 @@ class ClWorld:
         size_x = self.window[1] - self.window[0]
         size_y = self.window[3] - self.window[2]
 
-
-        scale_t = scale_matrix(max(self.window[0], self.window[1])-min(self.window[0], self.window[1]),
-                               max(self.window[2], self.window[3])-min(self.window[2], self.window[3]),
-                               max(self.window[4], self.window[5])-min(self.window[4], self.window[5]))
-        t2_1 = translation_matrix(-min(self.window[0], self.window[1]),
-                                  -min(self.window[2], self.window[3]),
-                                  -min(self.window[4], self.window[5]))
         window_transform = [[1, 0, 0, -self.window[0]],
                             [0, -1, 0, self.window[3]],
                             [0, 0, 1, 0],
                             [0, 0, 0, 1]]
-        scale_transform = scale_matrix(1/size_x * ratio_x, 1/size_y * ratio_y, 1)
+        scale_transform = scale_matrix(ratio_x, ratio_y, 1)
         viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
 
-        composite_transform = multiply_matrix(viewport_transform, multiply_matrix(scale_transform, multiply_matrix(window_transform, multiply_matrix(t2_1, scale_t))))
+        composite_transform = multiply_matrix(viewport_transform, scale_transform)
 
         lines = None
         if self.is_parallel:
