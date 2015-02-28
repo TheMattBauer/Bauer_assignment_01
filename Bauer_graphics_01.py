@@ -119,23 +119,29 @@ class ClWorld:
                                    -self.prp[2]]
         shear = shear_matrix(direction_of_projection[0], direction_of_projection[1], direction_of_projection[2])
 
-        vrp_prime = multiply_vector(t2, self.vrp)
+        vrp_prime = multiply_vector(t1, self.vrp)
+        vrp_prime = multiply_vector(rx, vrp_prime)
+        vrp_prime = multiply_vector(ry, vrp_prime)
+        vrp_prime = multiply_vector(rz, vrp_prime)
+        vrp_prime = multiply_vector(t2, vrp_prime)
         vrp_prime = multiply_vector(shear, vrp_prime)
 
         if (vrp_prime[2] + self.window[4]) * (vrp_prime[2] + self.window[5]) < 0:
             # double sided view volume
             return None
 
-        if abs(vrp_prime[2] + self.window[5]) > abs(self.vrp[2] + self.window[4]):
-            scale = scale_matrix(abs(vrp_prime[2]) / (self.center_of_window[0] * (vrp_prime[2] + self.window[5]) + .00000000000000000000000000001),
-                                 abs(vrp_prime[2]) / (self.center_of_window[1] * (vrp_prime[2] + self.window[5]) + .00000000000000000000000000001),
+        if abs(vrp_prime[2] + self.window[5]) > abs(vrp_prime[2] + self.window[4]):
+            scale = scale_matrix(abs(vrp_prime[2]) / (((self.window[1] - self.window[0]) / 2.0) * (vrp_prime[2] + self.window[5])),
+                                 abs(vrp_prime[2]) / (((self.window[3] - self.window[2]) / 2.0) * (vrp_prime[2] + self.window[5])),
                                  1 / (vrp_prime[2] + self.window[5]))
         else:
-            scale = scale_matrix(abs(vrp_prime[2]) / (self.center_of_window[0] * (vrp_prime[2] + self.window[4]) + .00000000000000000000000000001),
-                                 abs(vrp_prime[2]) / (self.center_of_window[1] * (vrp_prime[2] + self.window[4]) + .00000000000000000000000000001),
+            scale = scale_matrix(abs(vrp_prime[2]) / (((self.window[1] - self.window[0]) / 2.0) * (vrp_prime[2] + self.window[4])),
+                                 abs(vrp_prime[2]) / (((self.window[3] - self.window[2]) / 2.0) * (vrp_prime[2] + self.window[4])),
                                  1 / (vrp_prime[2] + self.window[4]))
 
         composite = multiply_matrix(scale, multiply_matrix(shear, multiply_matrix(t2, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
+
+
 
         verts = self.vertices.copy()
         for x in range(0, len(verts)):
@@ -380,6 +386,20 @@ class ClWorld:
 
 
 def clip_line_perspective(point_a, point_b):
+
+
+
+
+
+
+
+
+
+
+
+    point_a = [point_a[0]/point_a[2], point_a[1]/point_a[2], 0, 1.0]
+    point_b = [point_b[0]/point_b[2], point_b[1]/point_b[2], 0, 1.0]
+
     return [point_b, point_a]
 
 
