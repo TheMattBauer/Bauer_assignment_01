@@ -421,10 +421,46 @@ def clip_line_perspective(point_a, point_b, d, min_z):
         point_b = [-(d * point_b[0]/point_b[2]), -(d * point_b[1]/point_b[2]), 0, 1.0]
         return [point_a, point_b]
 
+    epsilon = .00000000000001
 
-    point_a = [-(d * point_a[0]/point_a[2]), -(d * point_a[1]/point_a[2]), 0, 1.0]
-    point_b = [-(d * point_b[0]/point_b[2]), -(d * point_b[1]/point_b[2]), 0, 1.0]
-    return [point_b, point_a]
+    new_points = []
+    move_vector = subtract_vectors(point_b, point_a)
+
+    plane_coefficients = [[1, 0, -1, 0],
+                          [1, 0, 1, 0],
+                          [0, 1, -1, 0],
+                          [0, 1, 1, 0],
+                          [0, 0, 1, -1],
+                          [0, 0, 1, -0.6]]
+
+    if abs(point_a[0]) <= point_a[2] + epsilon and abs(point_a[1]) <= point_a[2] + epsilon and min_z - epsilon <= point_a[2] <= 1 + epsilon:
+        new_points.append([-(d * point_a[0]/point_a[2]), -(d * point_a[1]/point_a[2]), 0, 1.0])
+    if abs(point_b[0]) <= point_b[2] + epsilon and abs(point_b[1]) <= point_b[2] + epsilon and min_z - epsilon <= point_b[2] <= 1 + epsilon:
+        new_points.append([-(d * point_b[0]/point_b[2]), -(d * point_b[1]/point_b[2]), 0, 1.0])
+
+    for plane_index in range(0, len(plane_coefficients)):
+        t = -(plane_coefficients[plane_index][0] * point_a[0] +
+              plane_coefficients[plane_index][1] * point_a[1] +
+              plane_coefficients[plane_index][2] * point_a[2] +
+              plane_coefficients[plane_index][3]) / \
+             (plane_coefficients[plane_index][0] * move_vector[0] +
+              plane_coefficients[plane_index][1] * move_vector[1] +
+              plane_coefficients[plane_index][2] * move_vector[2] + epsilon)
+        if 0 <= t <= 1:
+            # calculate new x y z point
+            point = [move_vector[0] * t + point_a[0],
+                     move_vector[1] * t + point_a[1],
+                     move_vector[2] * t + point_a[2],
+                     1.0]
+            if abs(point[0]) <= point[2] + epsilon and\
+               abs(point[1]) <= point[2] + epsilon and \
+               min_z - epsilon <= point[2] <= 1 + epsilon:
+
+                point = [-(d * point[0]/point[2]), -(d * point[1]/point[2]), 0, 1.0]
+                new_points.append(point)
+                if len(new_points) == 2:
+                    return new_points
+    return None
 
 
 def clip_line_parallel(point_a, point_b):
