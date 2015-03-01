@@ -58,22 +58,36 @@ class ClWorld:
         size_x = self.window[1] - self.window[0]
         size_y = self.window[3] - self.window[2]
 
-        window_transform = [[1, 0, 0, 0],
-                            [0, -1, 0, 0],
-                            [0, 0, 1, 0],
-                            [0, 0, 0, 1]]
-        scale_transform = scale_matrix(ratio_x, ratio_y, 1)
-        viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
 
-        composite_transform = window_transform
-        composite_transform = multiply_matrix(scale_transform, composite_transform)
-        composite_transform = multiply_matrix(viewport_transform, composite_transform)
 
-        lines = None
         if self.is_parallel:
             lines = self.unit_cube_clip()
+
+            window_transform = [[1, 0, 0, 0],
+                                [0, -1, 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]]
+            scale_transform = scale_matrix(ratio_x, ratio_y, 1)
+            viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
+
+            composite_transform = window_transform
+            composite_transform = multiply_matrix(scale_transform, composite_transform)
+            composite_transform = multiply_matrix(viewport_transform, composite_transform)
         else:
             lines = self.prp_clip()
+            window_size = lines[-1]
+            lines = lines[0:-2]
+
+            window_transform = [[1, 0, 0, abs(window_size[0])/2.0],
+                                [0, -1, 0, -abs(window_size[1])/2.0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]]
+            scale_transform = scale_matrix(1/abs(window_size[0]) * ratio_x, 1/abs(window_size[1]) * ratio_y, 1)
+            viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
+
+            composite_transform = window_transform
+            composite_transform = multiply_matrix(scale_transform, composite_transform)
+            composite_transform = multiply_matrix(viewport_transform, composite_transform)
 
         if not lines:
             return
@@ -114,6 +128,7 @@ class ClWorld:
                                    -self.prp[2]]
         shear = shear_matrix(direction_of_projection[0], direction_of_projection[1], direction_of_projection[2])
 
+        self.vrp.append(1.0)
         vrp_prime = multiply_vector(t1, self.vrp)
         vrp_prime = multiply_vector(rx, vrp_prime)
         vrp_prime = multiply_vector(ry, vrp_prime)
@@ -129,20 +144,23 @@ class ClWorld:
             scale = scale_matrix(abs(vrp_prime[2]) / (((self.window[1] - self.window[0]) / 2.0) * (vrp_prime[2] + self.window[5])),
                                  abs(vrp_prime[2]) / (((self.window[3] - self.window[2]) / 2.0) * (vrp_prime[2] + self.window[5])),
                                  1 / (vrp_prime[2] + self.window[5]))
+
+            min_z = (vrp_prime[2] + self.window[4]) / (vrp_prime[2] + self.window[5])
         else:
             scale = scale_matrix(abs(vrp_prime[2]) / (((self.window[1] - self.window[0]) / 2.0) * (vrp_prime[2] + self.window[4])),
                                  abs(vrp_prime[2]) / (((self.window[3] - self.window[2]) / 2.0) * (vrp_prime[2] + self.window[4])),
                                  1 / (vrp_prime[2] + self.window[4]))
 
+            min_z = (vrp_prime[2] + self.window[5]) / (vrp_prime[2] + self.window[4])
+
         composite = multiply_matrix(scale, multiply_matrix(shear, multiply_matrix(t2, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
-
-
 
         verts = self.vertices.copy()
         for x in range(0, len(verts)):
             verts[x] = multiply_vector(composite, verts[x])
 
         lines = []
+        d = multiply_vector(scale, self.prp)[2]
         for face in self.faces:
             points = []
             for x in range(0, len(face)):
@@ -153,12 +171,18 @@ class ClWorld:
 
             for x in range(0, len(points)):
                 if x == len(points)-1:
-                    line = clip_line_perspective(points[x], points[0])
+                    line = clip_line_perspective(points[x], points[0], d, min_z)
                 else:
-                    line = clip_line_perspective(points[x], points[x + 1])
+                    line = clip_line_perspective(points[x], points[x + 1], d, min_z)
 
                 if line:
                     lines.append(line)
+
+        a = multiply_vector(scale, [self.window[1], self.window[3], 0, 1.0])
+        b = multiply_vector(scale, [self.window[0], self.window[2], 0, 1.0])
+
+        lines.append(subtract_vectors(a, b))
+
         return lines
 
     def move(self, move_amount):
@@ -380,27 +404,32 @@ class ClWorld:
 '''
 
 
-def clip_line_perspective(point_a, point_b):
+def clip_line_perspective(point_a, point_b, d, min_z):
+    a_byte_array = make_byte_array_perspective(point_a, min_z)
+    b_byte_array = make_byte_array_perspective(point_b, min_z)
+
+    or_bytes = False
+    for x in range(0, len(a_byte_array)):
+        if a_byte_array[x] and b_byte_array[x]:
+            return None
+
+        if a_byte_array[x] or b_byte_array[x]:
+            or_bytes = True
+
+    if not or_bytes:
+        point_a = [-(d * point_a[0]/point_a[2]), -(d * point_a[1]/point_a[2]), 0, 1.0]
+        point_b = [-(d * point_b[0]/point_b[2]), -(d * point_b[1]/point_b[2]), 0, 1.0]
+        return [point_a, point_b]
 
 
-
-
-
-
-
-
-
-
-
-    point_a = [point_a[0]/point_a[2], point_a[1]/point_a[2], 0, 1.0]
-    point_b = [point_b[0]/point_b[2], point_b[1]/point_b[2], 0, 1.0]
-
+    point_a = [-(d * point_a[0]/point_a[2]), -(d * point_a[1]/point_a[2]), 0, 1.0]
+    point_b = [-(d * point_b[0]/point_b[2]), -(d * point_b[1]/point_b[2]), 0, 1.0]
     return [point_b, point_a]
 
 
 def clip_line_parallel(point_a, point_b):
-    a_byte_array = make_byte_array(point_a)
-    b_byte_array = make_byte_array(point_b)
+    a_byte_array = make_byte_array_parallel(point_a)
+    b_byte_array = make_byte_array_parallel(point_b)
 
     or_bytes = False
 
@@ -458,7 +487,46 @@ def transpose(matrix4):
     return transpose_mat
 
 
-def make_byte_array(vector):
+def make_byte_array_perspective(vector, z_min):
+
+    byte_array = []
+
+    if vector[0] > vector[2]:
+        byte_array.append(True)
+    else:
+        byte_array.append(False)
+
+    if vector[0] < -vector[2]:
+        byte_array.append(True)
+    else:
+        byte_array.append(False)
+
+    if vector[1] > vector[2]:
+        byte_array.append(True)
+    else:
+        byte_array.append(False)
+
+    if vector[1] < -vector[2]:
+        byte_array.append(True)
+    else:
+        byte_array.append(False)
+
+    if vector[2] > 1:
+        byte_array.append(True)
+    else:
+        byte_array.append(False)
+
+    if vector[2] < z_min:
+        byte_array.append(True)
+    else:
+        byte_array.append(False)
+
+    # print(byte_array)
+
+    return byte_array
+
+
+def make_byte_array_parallel(vector):
 
     byte_array = []
 
