@@ -30,6 +30,8 @@ class ClWorld:
         self.objects = objects
         self.canvases = canvases
 
+        self.cameras = read_cameras_file()
+
     def add_canvas(self, canvas):
         self.canvases.append(canvas)
         canvas.world = self
@@ -41,66 +43,8 @@ class ClWorld:
         for x in range(0, len(self.vertices)):
             self.vertices[x] = multiply_vector(self.composite_transform, self.vertices[x])
 
-        min_x = float(canvas.cget("width")) * self.viewport[0]
-        max_x = float(canvas.cget("width")) * self.viewport[2]
-
-        min_y = float(canvas.cget("height")) * self.viewport[1]
-        max_y = float(canvas.cget("height")) * self.viewport[3]
-
-        self.objects.append(canvas.create_rectangle(min_x, max_y, max_x, min_y))
-
-        ratio_x = (max_x - min_x)
-        tran_x = min_x
-
-        ratio_y = (max_y - min_y)
-        tran_y = max_y
-
-        size_x = self.window[1] - self.window[0]
-        size_y = self.window[3] - self.window[2]
-
-
-
-        if self.is_parallel:
-            lines = self.unit_cube_clip()
-
-            window_transform = [[1, 0, 0, 0],
-                                [0, -1, 0, 0],
-                                [0, 0, 1, 0],
-                                [0, 0, 0, 1]]
-            scale_transform = scale_matrix(ratio_x, ratio_y, 1)
-            viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
-
-            composite_transform = window_transform
-            composite_transform = multiply_matrix(scale_transform, composite_transform)
-            composite_transform = multiply_matrix(viewport_transform, composite_transform)
-        else:
-            lines = self.prp_clip()
-            window_size = lines[-1]
-            lines = lines[0:-2]
-
-            window_transform = [[1, 0, 0, abs(window_size[0])/2.0],
-                                [0, -1, 0, -abs(window_size[1])/2.0],
-                                [0, 0, 1, 0],
-                                [0, 0, 0, 1]]
-            scale_transform = scale_matrix(1/abs(window_size[0]) * ratio_x, 1/abs(window_size[1]) * ratio_y, 1)
-            viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
-
-            composite_transform = window_transform
-            composite_transform = multiply_matrix(scale_transform, composite_transform)
-            composite_transform = multiply_matrix(viewport_transform, composite_transform)
-
-        if not lines:
-            return
-
-        # print(lines)
-        for line_index in range(0, len(lines)):
-            # print(lines[line_index])
-            for point_index in range(0, len(lines[line_index])):
-                lines[line_index][point_index].append(1.0)
-                lines[line_index][point_index] = multiply_vector(composite_transform, lines[line_index][point_index])
-
-            self.objects.append(canvas.create_line(lines[line_index][0][0], lines[line_index][0][1],
-                                                   lines[line_index][1][0], lines[line_index][1][1]))
+        for camera in self.cameras:
+            camera.display(self.objects, canvas, self.vertices, self.faces)
 
         self.composite_transform = [[1, 0, 0, 0],
                                     [0, 1, 0, 0],
@@ -404,6 +348,206 @@ class ClWorld:
 '''
 
 
+class Camera:
+    def __init__(self):
+        self.vrp = None
+        self.vpn = None
+        self.vup = None
+        self.prp = None
+        self.window = None
+        self.viewport = None
+        self.center_of_window = None
+        self.is_parallel = True
+        self.name = ""
+
+    def display(self, objects, canvas, vertices, faces):
+
+        min_x = float(canvas.cget("width")) * self.viewport[0]
+        max_x = float(canvas.cget("width")) * self.viewport[2]
+
+        min_y = float(canvas.cget("height")) * self.viewport[1]
+        max_y = float(canvas.cget("height")) * self.viewport[3]
+
+        objects.append(canvas.create_rectangle(min_x, max_y, max_x, min_y))
+
+        ratio_x = (max_x - min_x)
+        tran_x = min_x
+
+        ratio_y = (max_y - min_y)
+        tran_y = max_y
+
+        if self.is_parallel:
+            lines = self.unit_cube_clip(vertices, faces)
+
+            window_transform = [[1, 0, 0, 0],
+                                [0, -1, 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]]
+            scale_transform = scale_matrix(ratio_x, ratio_y, 1)
+            viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
+
+            composite_transform = window_transform
+            composite_transform = multiply_matrix(scale_transform, composite_transform)
+            composite_transform = multiply_matrix(viewport_transform, composite_transform)
+        else:
+            lines = self.prp_clip(vertices, faces)
+            window_size = lines[-1]
+            lines = lines[0:-2]
+
+            window_transform = [[1, 0, 0, abs(window_size[0])/2.0],
+                                [0, -1, 0, -abs(window_size[1])/2.0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]]
+            scale_transform = scale_matrix(1/abs(window_size[0]) * ratio_x, 1/abs(window_size[1]) * ratio_y, 1)
+            viewport_transform = translation_matrix(-tran_x, -tran_y, 0)
+
+            composite_transform = window_transform
+            composite_transform = multiply_matrix(scale_transform, composite_transform)
+            composite_transform = multiply_matrix(viewport_transform, composite_transform)
+
+        if not lines:
+            return
+
+        # print(lines)
+        for line_index in range(0, len(lines)):
+            # print(lines[line_index])
+            for point_index in range(0, len(lines[line_index])):
+                lines[line_index][point_index].append(1.0)
+                lines[line_index][point_index] = multiply_vector(composite_transform, lines[line_index][point_index])
+
+            objects.append(canvas.create_line(lines[line_index][0][0], lines[line_index][0][1],
+                                              lines[line_index][1][0], lines[line_index][1][1]))
+
+    def unit_cube_clip(self, vertices, faces):
+        t1 = translation_matrix(self.vrp[0], self.vrp[1], self.vrp[2])
+
+        rx = rotate_to_plane_matrix('x', self.vpn[0], self.vpn[1], self.vpn[2])
+        vpn_prime = multiply_vector(rx, self.vpn)
+
+        ry = rotate_to_plane_matrix('y', vpn_prime[0], vpn_prime[1], vpn_prime[2])
+
+        vup_prime = multiply_vector(rx, self.vup)
+        vup_prime = multiply_vector(ry, vup_prime)
+        rz = rotate_to_plane_matrix('z', vup_prime[0], vup_prime[1], vup_prime[2])
+
+        direction_of_projection = [self.center_of_window[0] - self.prp[0],
+                                   self.center_of_window[1] - self.prp[1],
+                                   -self.prp[2]]
+
+        shear = shear_matrix(direction_of_projection[0], direction_of_projection[1], direction_of_projection[2])
+
+        t2 = translation_matrix(min(self.window[0], self.window[1]),
+                                min(self.window[2], self.window[3]),
+                                min(self.window[4], self.window[5]))
+
+        scale = scale_matrix(1/(max(self.window[0], self.window[1])-min(self.window[0], self.window[1])),
+                             1/(max(self.window[2], self.window[3])-min(self.window[2], self.window[3])),
+                             1/(max(self.window[4], self.window[5])-min(self.window[4], self.window[5])))
+
+        composite = multiply_matrix(scale, multiply_matrix(t2, multiply_matrix(shear, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
+
+        verts = vertices.copy()
+        for x in range(0, len(verts)):
+            verts[x] = multiply_vector(composite, verts[x])
+
+        lines = []
+        for face in faces:
+            points = []
+            for x in range(0, len(face)):
+                points.append([verts[face[x]][0],
+                               verts[face[x]][1],
+                               verts[face[x]][2],
+                               1.0])
+
+            for x in range(0, len(points)):
+                if x == len(points)-1:
+                    line = clip_line_parallel(points[x], points[0])
+                else:
+                    line = clip_line_parallel(points[x], points[x + 1])
+
+                if line:
+                    lines.append(line)
+        return lines
+
+    def prp_clip(self, vertices, faces):
+        t1 = translation_matrix(self.vrp[0], self.vrp[1], self.vrp[2])
+
+        rx = rotate_to_plane_matrix('x', self.vpn[0], self.vpn[1], self.vpn[2])
+        vpn_prime = multiply_vector(rx, self.vpn)
+
+        ry = rotate_to_plane_matrix('y', vpn_prime[0], vpn_prime[1], vpn_prime[2])
+
+        vup_prime = multiply_vector(rx, self.vup)
+        vup_prime = multiply_vector(ry, vup_prime)
+        rz = rotate_to_plane_matrix('z', vup_prime[0], vup_prime[1], vup_prime[2])
+
+        #************************************************************
+
+        t2 = translation_matrix(self.prp[0], self.prp[1], self.prp[2])
+
+        direction_of_projection = [self.center_of_window[0] - self.prp[0],
+                                   self.center_of_window[1] - self.prp[1],
+                                   -self.prp[2]]
+        shear = shear_matrix(direction_of_projection[0], direction_of_projection[1], direction_of_projection[2])
+
+        self.vrp.append(1.0)
+        vrp_prime = multiply_vector(t1, self.vrp)
+        vrp_prime = multiply_vector(rx, vrp_prime)
+        vrp_prime = multiply_vector(ry, vrp_prime)
+        vrp_prime = multiply_vector(rz, vrp_prime)
+        vrp_prime = multiply_vector(t2, vrp_prime)
+        vrp_prime = multiply_vector(shear, vrp_prime)
+
+        if (vrp_prime[2] + self.window[4]) * (vrp_prime[2] + self.window[5]) < 0:
+            # double sided view volume
+            return None
+
+        if abs(vrp_prime[2] + self.window[5]) > abs(vrp_prime[2] + self.window[4]):
+            scale = scale_matrix(abs(vrp_prime[2]) / (((self.window[1] - self.window[0]) / 2.0) * (vrp_prime[2] + self.window[5])),
+                                 abs(vrp_prime[2]) / (((self.window[3] - self.window[2]) / 2.0) * (vrp_prime[2] + self.window[5])),
+                                 1 / (vrp_prime[2] + self.window[5]))
+
+            min_z = (vrp_prime[2] + self.window[4]) / (vrp_prime[2] + self.window[5])
+        else:
+            scale = scale_matrix(abs(vrp_prime[2]) / (((self.window[1] - self.window[0]) / 2.0) * (vrp_prime[2] + self.window[4])),
+                                 abs(vrp_prime[2]) / (((self.window[3] - self.window[2]) / 2.0) * (vrp_prime[2] + self.window[4])),
+                                 1 / (vrp_prime[2] + self.window[4]))
+
+            min_z = (vrp_prime[2] + self.window[5]) / (vrp_prime[2] + self.window[4])
+
+        composite = multiply_matrix(scale, multiply_matrix(shear, multiply_matrix(t2, multiply_matrix(rz, multiply_matrix(ry , multiply_matrix(rx, t1))))))
+
+        verts = vertices.copy()
+        for x in range(0, len(verts)):
+            verts[x] = multiply_vector(composite, verts[x])
+
+        lines = []
+        d = multiply_vector(scale, self.prp)[2]
+        for face in faces:
+            points = []
+            for x in range(0, len(face)):
+                points.append([verts[face[x]][0],
+                               verts[face[x]][1],
+                               verts[face[x]][2],
+                               1.0])
+
+            for x in range(0, len(points)):
+                if x == len(points)-1:
+                    line = clip_line_perspective(points[x], points[0], d, min_z)
+                else:
+                    line = clip_line_perspective(points[x], points[x + 1], d, min_z)
+
+                if line:
+                    lines.append(line)
+
+        a = multiply_vector(scale, [self.window[1], self.window[3], 0, 1.0])
+        b = multiply_vector(scale, [self.window[0], self.window[2], 0, 1.0])
+
+        lines.append(subtract_vectors(a, b))
+
+        return lines
+
+
 def clip_line_perspective(point_a, point_b, d, min_z):
     a_byte_array = make_byte_array_perspective(point_a, min_z)
     b_byte_array = make_byte_array_perspective(point_b, min_z)
@@ -691,3 +835,65 @@ def rotate_to_plane_matrix(axis_of_rotation, a, b, c):
             [0, 1, 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1]]
+
+
+def read_cameras_file():
+    file = open("cameras_04.txt")
+
+    cameras = []
+
+    for line in file.read().splitlines():
+        leading_char = line[:1]
+        variable_list = []
+
+        if leading_char == "c":
+            current_camera = Camera()
+            cameras.append(current_camera)
+            continue
+        elif leading_char == "i":
+            current_camera.name = line[1:].strip()
+            continue
+        elif leading_char == "t":
+            if line[1:].strip() == "parallel":
+                current_camera.is_parallel = True
+            else:
+                current_camera.is_parallel = False
+            continue
+
+        for value in line[1:].strip().split():
+
+            if leading_char == "r":
+                variable_list.append(float(value))
+            elif leading_char == "n":
+                variable_list.append(float(value))
+            elif leading_char == "u":
+                variable_list.append(float(value))
+            elif leading_char == "p":
+                variable_list.append(float(value))
+            elif leading_char == "w":
+                variable_list.append(float(value))
+            elif leading_char == "s":
+                variable_list.append(float(value))
+
+        if leading_char == "r":
+            variable_list.append(1.0)
+            current_camera.vrp = variable_list
+        elif leading_char == "n":
+            variable_list.append(1.0)
+            current_camera.vpn = variable_list
+        elif leading_char == "u":
+            variable_list.append(1.0)
+            current_camera.vup = variable_list
+        elif leading_char == "p":
+            variable_list.append(1.0)
+            current_camera.prp = variable_list
+        elif leading_char == "w":
+            current_camera.window = variable_list
+            current_camera.center_of_window = [(variable_list[0] + variable_list[1]) / 2.0,
+                                               (variable_list[2] + variable_list[3]) / 2.0,
+                                               0]
+        elif leading_char == "s":
+            current_camera.viewport = variable_list
+
+    file.close()
+    return cameras
